@@ -1,5 +1,6 @@
 import random
 import argparse
+from pathlib import Path
 
 def generate_dataset(size, balance=1,lower_scope = (1, 100) , upper_scope = (2000, 20000)):
     dataset = []
@@ -13,36 +14,27 @@ def generate_dataset(size, balance=1,lower_scope = (1, 100) , upper_scope = (200
     random.shuffle(dataset)
     return dataset
 
-def export_datasets(filename, num_datasets, size_per_dataset, balanced=True):
+def export_datasets(filename, num_datasets = 10, datasets_sizes = [10], balanced=True, path = "examples"):
     try:
-        with open(filename, 'w') as f:
+        Path(path).mkdir(parents=True, exist_ok=True)
+        
+        full_path = Path(path) / filename
+        with open(full_path, 'w') as f:
             f.write(f"{num_datasets}\n")
             
-            for _ in range(num_datasets):
-                dataset = generate_dataset(size_per_dataset, balanced)
+            for i in range(num_datasets):
+                size = datasets_sizes[  i % len(datasets_sizes)]
+                dataset = generate_dataset(size, balanced)
                 line = " ".join(map(str, dataset))
                 f.write(f"{line}\n")
                 
-        typ_danych = "Zbalansowane" if balanced else "Niezbalansowane"
-        print(f"[{typ_danych}] Pomyślnie zapisano {num_datasets} zestawów danych do pliku '{filename}'.")
+        
+        print(f"Successfully created dataset.")
     except Exception as e:
-        print(f"Wystąpił błąd podczas zapisu: {e}")
+        print(f"Error encoutered: {e}")
 
 if __name__ == "__main__":
-    # --- PRZYKŁAD UŻYCIA ---
-    
-    # 1. Generujemy standardowe (zbalansowane) zestawy do pliku 'dane_zbalansowane.txt'
-    export_datasets(
-        filename="dane_zbalansowane.txt", 
-        num_datasets=5, 
-        size_per_dataset=25, 
-        balanced=True
-    )
-    
-    # 2. Generujemy trudniejsze (niezbalansowane) zestawy do pliku 'dane_trudne.txt'
-    export_datasets(
-        filename="dane_trudne.txt", 
-        num_datasets=3, 
-        size_per_dataset=30, 
-        balanced=False
-    )
+    export_datasets("unit_tests_dataset")
+    export_datasets("stress_tests_dataset", 12, [10,100,1000,10000])
+    export_datasets("unbalanced_tests_dataset", 10, [100], balanced=False )
+    export_datasets("hard_tests", 3, [10000], balanced=False)
