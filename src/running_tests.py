@@ -1,5 +1,6 @@
 import math
 import time 
+import statistics
 from itertools import combinations
 from pathlib import Path
 
@@ -42,8 +43,8 @@ def run_tests(filepath, algorithm_func, k=2):
             sums = [sum(p) for p in partitions]
             max_diff = max(sums) - min(sums)
             pairwise_diffs = [abs(suma_a - suma_b) for suma_a, suma_b in combinations(sums, 2)]
-            avg_diff = sum(pairwise_diffs) / len(pairwise_diffs) if pairwise_diffs else 0
-            std_diff = math.sqrt(sum((x - avg_diff) ** 2 for x in pairwise_diffs) / len(pairwise_diffs)) if pairwise_diffs else 0
+            avg_diff = statistics.mean(sums) if sums else 0
+            std_diff = statistics.stdev(pairwise_diffs) if pairwise_diffs else 0
 
             standardized_max_diff.append(max_diff / sum(sums) if sum(sums) != 0 else 0)
             standardized_avg_diff.append(avg_diff / sum(sums) if sum(sums) != 0 else 0)
@@ -54,10 +55,9 @@ def run_tests(filepath, algorithm_func, k=2):
             print("No datasets were processed. Exiting.")
             return
 
-        avg_diff = sum(standardized_avg_diff) / n
-        avg_max_diff = sum(standardized_max_diff) / n
-        avg_std_diff = sum(standardized_std_diff) / n
-        
+        avg_diff = statistics.mean(standardized_avg_diff)
+        avg_max_diff = statistics.mean(standardized_max_diff)
+        avg_std_diff = statistics.mean(standardized_std_diff)
 
         print(f"\n=== Test Report: {Path(filepath).name} ===")
         print(f"Algorithm: {algorithm_func.__name__} | Datasets: {n} | Number of Subsets (k): {k}")
