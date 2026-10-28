@@ -1,24 +1,29 @@
 import time
 import statistics
+from collections import Counter
 from itertools import combinations
 from pathlib import Path
 
 
-def validate_partitions(original_dataset, partitions):
+def validate_partitions(original_dataset, partitions, k):
     """Check whether all original numbers are preserved."""
     flattened_partitions = [item for sublist in partitions for item in sublist]
-    return sorted(original_dataset) == sorted(flattened_partitions)
+    return len(partitions) == k and sorted(original_dataset) == sorted(flattened_partitions)
 
 
-def process_single_dataset(dataset, algorithm_func, k, index):
+def process_single_dataset(dataset, algorithm_func, k, index, *, metadata=None):
     """Run an algorithm and calculate partition quality metrics."""
+    if k < 1:
+        raise ValueError("k must be greater than zero.")
     start_time = time.perf_counter()
-    partitions = algorithm_func(dataset.copy(), k)
+    if metadata is None:
+        partitions = algorithm_func(dataset.copy(), k)
+    else:
+        partitions = algorithm_func(dataset.copy(), k, metadata=metadata)
     exec_time = time.perf_counter() - start_time
 
-    if not validate_partitions(dataset, partitions):
-        print(f"\n[Critical Error] Data integrity check failed for dataset {index}!")
-        return None
+    if not validate_partitions(dataset, partitions, k):
+        raise ValueError(f"Invalid partition for dataset {index}: expected {k} groups preserving all numbers.")
 
     sums = [sum(p) for p in partitions]
     total_sum = sum(sums)
@@ -53,28 +58,36 @@ def print_final_report(filepath, algo_name, n, k, avg_diff, avg_max, avg_cv, avg
     print("=======================================================\n")
 
 
-def run_tests(filepath, algorithm_func, k=2):
+def run_tests(filepath, algorithm_func, k=2, *, repeats=1, records=None):
     """Test an algorithm on datasets loaded from a file."""
     try:
+        if repeats < 1:
+            raise ValueError("repeats must be greater than zero.")
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = [line.strip() for line in f if line.strip()]
 
         if not lines:
-            print("File is empty.")
-            return
+            raise ValueError("File is empty.")
+
+        expected = int(lines[0])
+        if expected < 1 or len(lines) - 1 != expected:
+            raise ValueError("Dataset count does not match the file header.")
 
         results = []
+        details = []
         for i in range(1, int(lines[0]) + 1):
-            if i >= len(lines):
-                break
-
             dataset = list(map(int, lines[i].split()))
-            metrics = process_single_dataset(dataset, algorithm_func, k, i)
-
-            if metrics is None:
-                return  # Stop if data integrity validation fails.
-
-            results.append(metrics)
+            for repeat in range(1, repeats + 1):
+                metadata = {} if records is not None else None
+                metrics = process_single_dataset(dataset, algorithm_func, k, i, metadata=metadata)
+                results.append(metrics)
+                if metadata is not None:
+                    details.append(metadata)
+                    records.append(dict(dataset_index=i, size=len(dataset), k=k,
+                                        repeat=repeat, time_seconds=metrics[0],
+                                        standardized_max_difference=metrics[1],
+                                        standardized_avg_difference=metrics[2],
+                                        cv=metrics[3], **metadata))
 
         if not results:
             print("No datasets were processed. Exiting.")
@@ -86,8 +99,15 @@ def run_tests(filepath, algorithm_func, k=2):
         avg_diff = statistics.mean([res[2] for res in results])
         avg_cv = statistics.mean([res[3] for res in results])
 
-        print_final_report(filepath, algorithm_func.__name__, len(results), k, avg_diff, avg_max_diff, avg_cv, avg_time)
+        print_final_report(filepath, algorithm_func.__name__, expected, k, avg_diff, avg_max_diff, avg_cv, avg_time)
+        print(f"Repeats per dataset: {repeats}")
+        if details:
+            print(f"Strategies: {dict(Counter(d.get('strategy', 'unknown') for d in details))}")
+            print(f"LP statuses: {dict(Counter(d.get('lp_status', 'NotRun') for d in details))}")
+            scopes = sorted({d.get('lp_scope', '') for d in details} - {''})
+            if scopes:
+                print(f"LP scope: {', '.join(scopes)} (optimality applies only to this scope)")
         return avg_diff, avg_max_diff, avg_cv, avg_time
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        raise RuntimeError(f"Benchmark failed for {filepath}: {e}") from e
