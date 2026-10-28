@@ -360,6 +360,13 @@ solver execution took place; `Error` indicates failure before a solver status
 was available. The solver uses one thread and random seed zero; time limits and
 elapsed times can still cause differences across machines and runs.
 
+Before building an LP model, KK and then, if necessary, GNP are checked for a
+zero-range partition of that model's input. A zero range proves optimality and
+returns immediately without building or solving the MILP. This is reported as
+`HeuristicOptimal`, with `lp_optimal=True` and `lp_attempted=False`. The check is
+skipped if the input sum is not divisible by the number of groups, since a zero
+range is then impossible. A perfect KK partition also skips the GNP call.
+
 Generate repeatable input files using a fixed seed:
 
 ```bash

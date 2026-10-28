@@ -1,6 +1,8 @@
 import math
 import pulp
 from pulp.constants import LpSolveStatus
+from algorithm_kk import algorithm_kk
+from algorithm_gnp import algorithm_gnp
 
 
 def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None):
@@ -10,11 +12,24 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None):
     if not math.isfinite(time_limit) or time_limit <= 0:
         raise ValueError("time_limit must be finite and greater than zero.")
     if metadata is not None:
-        metadata.update(lp_status="NotRun", lp_optimal=False)
+        metadata.update(lp_status="NotRun", lp_optimal=False, lp_attempted=False)
     if any(number < 0 for number in A):
         raise ValueError("LP requires non-negative data.")
     if not A:
         return [[] for _ in range(k)]
+
+    # A zero range is a global optimum for this input. Avoid building the MILP.
+    # If the total is not divisible by k, such a partition cannot exist.
+    if sum(A) % k == 0:
+        initial = algorithm_kk(A, k)
+        sums = list(map(sum, initial))
+        if max(sums) != min(sums):
+            initial = algorithm_gnp(A, [0] * k)
+            sums = list(map(sum, initial))
+        if max(sums) == min(sums):
+            if metadata is not None:
+                metadata.update(lp_status="HeuristicOptimal", lp_optimal=True)
+            return initial
 
     n = len(A)
     rn = range(n)
@@ -52,6 +67,8 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None):
 
     # Solve with a one-second time limit.
     solver = pulp.HiGHS(msg=False, timeLimit=time_limit, threads=1, random_seed=0)
+    if metadata is not None:
+        metadata["lp_attempted"] = True
     result = prob.solve(solver)
     if metadata is not None:
         metadata.update(

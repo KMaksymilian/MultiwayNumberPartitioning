@@ -62,7 +62,7 @@ class ExperimentTests(unittest.TestCase):
 
         metadata = {}
         with patch.object(pulp.LpProblem, "solve", limited):
-            algorithm_lp([1, 2, 3], 2, metadata=metadata)
+            algorithm_lp([1, 2, 4], 2, metadata=metadata)
         self.assertEqual(metadata["lp_status"], "TimeLimit")
         self.assertFalse(metadata["lp_optimal"])
 
@@ -86,7 +86,7 @@ class ExperimentTests(unittest.TestCase):
                                     seed=42, path=directory)
             self.assertEqual((directory / "a").read_bytes(), (directory / "b").read_bytes())
             source = directory / "input"
-            source.write_text("1\n1 2 3\n", encoding="utf-8")
+            source.write_text("1\n1 2 4\n", encoding="utf-8")
             output = directory / "results.csv"
             root = Path(__file__).resolve().parents[1]
             result = subprocess.run(
