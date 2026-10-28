@@ -86,7 +86,7 @@ class ExperimentTests(unittest.TestCase):
                                     seed=42, path=directory)
             self.assertEqual((directory / "a").read_bytes(), (directory / "b").read_bytes())
             source = directory / "input"
-            source.write_text("1\n1 2 3\n", encoding="utf-8")
+            source.write_text("1\n1 1 1 100\n", encoding="utf-8")
             output = directory / "results.csv"
             root = Path(__file__).resolve().parents[1]
             result = subprocess.run(
@@ -103,10 +103,14 @@ class ExperimentTests(unittest.TestCase):
             for row in rows:
                 self.assertTrue(row["pulp_version"])
                 self.assertEqual(len(row["dataset_sha256"]), 64)
-                self.assertEqual(row["size"], "3")
+                self.assertEqual(row["size"], "4")
                 if row["algorithm"] == "lp":
                     self.assertEqual(row["lp_status"], "Optimal")
                     self.assertEqual(row["lp_scope"], "full_dataset")
+                if row["algorithm"] == "orchestrator":
+                    self.assertEqual(row["pruning_enabled"], "True")
+                    self.assertEqual(row["strategy"], "lp+gnp")
+                    self.assertTrue(row["initial_range"])
 
 
 if __name__ == "__main__":

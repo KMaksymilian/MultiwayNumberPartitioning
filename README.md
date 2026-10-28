@@ -109,11 +109,17 @@ The default CV threshold is `0.6`.
    \]
 
 4. Numbers greater than or equal to `T` are classified as large numbers.
-5. Calculate the CV of the large-number group.
-6. Apply KK or LP to the large-number group, depending on its CV.
+5. Always invoke LP on the large-number group, including singleton groups.
+6. For this reduced instance only, use the better KK/GNP partition as a MIP
+   start and range cutoff, bound each group sum using that cutoff, and order
+   group sums to reduce symmetry. All bounds use only the extracted numbers.
 7. If LP fails or produces an invalid result, fall back to KK.
 8. Distribute the remaining smaller numbers using GNP.
 9. Validate the final partitioning result.
+
+The initial whole-dataset CV check is unchanged. Standalone LP does not enable
+these pruning constraints by default. An empty extracted group returns empty
+partitions without solving a model. The existing solver time limit still applies.
 
 The orchestrator is designed to combine the strengths of different methods without changing their underlying implementations.
 

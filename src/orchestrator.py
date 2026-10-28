@@ -70,34 +70,19 @@ def orchestrator_partitioning(
         num for num in dataset if num < threshold_large
     ]
 
-    if len(basket2_large) < 2:
-        metadata["strategy"] = "kk"
-        return algorithm_kk(dataset, k)
-
-    mean_b2 = statistics.mean(basket2_large)
-    std_dev_b2 = statistics.stdev(basket2_large)
-    cv_b2 = std_dev_b2 / mean_b2 if mean_b2 > 0 else 0.0
-
-    # Select an algorithm for large numbers.
-    if cv_b2 <= cv_threshold:
-        metadata["strategy"] = "kk+gnp"
+    # Always optimize the reduced large-number instance; CV only controls splitting.
+    metadata.update(strategy="lp+gnp", lp_attempted=True)
+    try:
+        partitions = algorithm_lp(basket2_large, k, time_limit=time_limit,
+                                  metadata=metadata, pruning=True)
+        if not _is_valid_partition(basket2_large, partitions, k):
+            raise RuntimeError("Invalid LP result.")
+    except Exception as error:
+        if metadata["lp_status"] == "NotRun":
+            metadata["lp_status"] = "Error"
+        metadata.update(strategy="kk+gnp_fallback", fallback_reason=str(error))
+        logger.warning("LP failed; falling back to KK: %s", error)
         partitions = algorithm_kk(basket2_large, k)
-    else:
-        metadata.update(strategy="lp+gnp", lp_attempted=True)
-        try:
-            partitions = algorithm_lp(basket2_large, k, time_limit=time_limit, metadata=metadata)
-
-            if not _is_valid_partition(
-                basket2_large, partitions, k
-            ):
-                raise RuntimeError("Invalid LP result.")
-
-        except Exception as error:
-            if metadata["lp_status"] == "NotRun":
-                metadata["lp_status"] = "Error"
-            metadata.update(strategy="kk+gnp_fallback", fallback_reason=str(error))
-            logger.warning("LP failed; falling back to KK: %s", error)
-            partitions = algorithm_kk(basket2_large, k)
 
     # Distribute remaining numbers.
     leftovers = algorithm_gnp(

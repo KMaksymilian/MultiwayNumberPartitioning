@@ -228,7 +228,8 @@ def main():
             row.update(provenance)
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         with args.csv.open("w", newline="", encoding="utf-8") as output:
-            writer = csv.DictWriter(output, fieldnames=list(records[0]))
+            fields = list(dict.fromkeys(key for row in records for key in row))
+            writer = csv.DictWriter(output, fieldnames=fields)
             writer.writeheader()
             writer.writerows(records)
         print(f"Results saved to {args.csv}")
