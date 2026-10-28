@@ -1,16 +1,17 @@
-import time 
+import time
 import statistics
 from itertools import combinations
 from pathlib import Path
 
 
 def validate_partitions(original_dataset, partitions):
+    """Check whether all original numbers are preserved."""
     flattened_partitions = [item for sublist in partitions for item in sublist]
     return sorted(original_dataset) == sorted(flattened_partitions)
 
 
-
 def process_single_dataset(dataset, algorithm_func, k, index):
+    """Run an algorithm and calculate partition quality metrics."""
     start_time = time.perf_counter()
     partitions = algorithm_func(dataset.copy(), k)
     exec_time = time.perf_counter() - start_time
@@ -22,7 +23,7 @@ def process_single_dataset(dataset, algorithm_func, k, index):
     sums = [sum(p) for p in partitions]
     total_sum = sum(sums)
     ideal_sum = total_sum / k
-    
+
     max_diff = max(sums) - min(sums)
     pairwise_diffs = [abs(a - b) for a, b in combinations(sums, 2)]
     avg_diff = statistics.mean(pairwise_diffs) if pairwise_diffs else 0
@@ -38,7 +39,9 @@ def process_single_dataset(dataset, algorithm_func, k, index):
     print(f"Dataset {index}: Time: {exec_time:.6f}s | Max Diff: {max_diff} | Avg Diff: {avg_diff:.4f} | CV: {std_cv:.4f}")
     return exec_time, std_max, std_avg, std_cv
 
+
 def print_final_report(filepath, algo_name, n, k, avg_diff, avg_max, avg_cv, avg_time):
+    """Display the final performance report."""
     print(f"\n=== Test Report: {Path(filepath).name} ===")
     print(f"Algorithm: {algo_name} | Datasets: {n} | Number of Subsets (k): {k}")
     print("Validation of Subsets:\tPASSED (no values were added or removed)")
@@ -49,11 +52,13 @@ def print_final_report(filepath, algo_name, n, k, avg_diff, avg_max, avg_cv, avg
     print(f"Average Execution Time:         \t{avg_time:.6f} s")
     print("=======================================================\n")
 
+
 def run_tests(filepath, algorithm_func, k=2):
+    """Test an algorithm on datasets loaded from a file."""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = [line.strip() for line in f if line.strip()]
-            
+
         if not lines:
             print("File is empty.")
             return
@@ -61,20 +66,21 @@ def run_tests(filepath, algorithm_func, k=2):
         results = []
         for i in range(1, int(lines[0]) + 1):
             if i >= len(lines):
-                break 
-            
+                break
+
             dataset = list(map(int, lines[i].split()))
             metrics = process_single_dataset(dataset, algorithm_func, k, i)
-            
+
             if metrics is None:
-                return # Przerywamy w przypadku błędu integralności danych
+                return  # Stop if data integrity validation fails.
+
             results.append(metrics)
 
         if not results:
             print("No datasets were processed. Exiting.")
             return
 
-        # Wyciągamy średnie z zebranych wyników
+        # Calculate average metrics.
         avg_time = statistics.mean([res[0] for res in results])
         avg_max_diff = statistics.mean([res[1] for res in results])
         avg_diff = statistics.mean([res[2] for res in results])
