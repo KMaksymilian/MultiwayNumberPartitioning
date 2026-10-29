@@ -5,6 +5,7 @@ from itertools import combinations
 from pathlib import Path
 
 from dataset_generator import generate_with_target_cv, dataset_cv
+from distributions import DISTRIBUTIONS
 
 
 def validate_partitions(original_dataset, partitions):
@@ -104,54 +105,113 @@ def validate_generated_dataset(dataset, expected_size):
 
 
 def check_target_cv(cv, size=100_000, distribution="lognormal", mean=10_000, seed=None):
-	"""Generate one dataset with a target CV and compare it with the measured CV."""
+	"""Generate one dataset with a target CV and compare it with the measured CV.
+
+	Returns None when the distribution cannot reach the requested CV.
+	"""
 	rng = random.Random(seed)
-	dataset = generate_with_target_cv(size, cv, distribution, mean, rng)
+	try:
+		dataset = generate_with_target_cv(size, cv, distribution, mean, rng)
+	except ValueError:
+		return None
 
 	size_ok, natural_ok = validate_generated_dataset(dataset, size)
 	measured_cv = dataset_cv(dataset)
 	abs_diff = abs(measured_cv - cv)
 	rel_diff = abs_diff / cv
+	# With mean 10 000 a value of 1 practically only comes from clipping in discretize().
+	ones_share = dataset.count(1) / size if size else 0.0
 
 	return {
+		"distribution": distribution,
 		"target_cv": cv,
 		"measured_cv": measured_cv,
 		"abs_diff": abs_diff,
 		"rel_diff": rel_diff,
+		"ones_share": ones_share,
 		"size_ok": size_ok,
 		"natural_ok": natural_ok,
 	}
 
 
-def run_generator_tests(cvs=(0.3, 0.6, 1.0, 1.5, 2.0, 3.0), size=100_000,
-                        distribution="lognormal", mean=10_000, seed=None):
-	"""Check the target-CV generator for several CV values and print a report."""
-	results = [check_target_cv(cv, size, distribution, mean, seed) for cv in cvs]
-
-	size_failed = [r["target_cv"] for r in results if not r["size_ok"]]
-	natural_failed = [r["target_cv"] for r in results if not r["natural_ok"]]
-
-	print(f"\n=== Generator Test: {distribution} | Size: {size} | Mean: {mean} | Seed: {seed} ===")
+def print_generator_validation(results, size):
+	"""Print size and natural-number validation for a list of generator results."""
+	size_failed = [(r["distribution"], r["target_cv"]) for r in results if not r["size_ok"]]
+	natural_failed = [(r["distribution"], r["target_cv"]) for r in results if not r["natural_ok"]]
 
 	if size_failed:
-		print(f"Validation of Size:\t\tFAILED for target CV: {size_failed}")
+		print(f"Validation of Size:\t\tFAILED for (distribution, CV): {size_failed}")
 	else:
 		print(f"Validation of Size:\t\tPASSED (every dataset has {size} numbers)")
 
 	if natural_failed:
-		print(f"Validation of Values:\tFAILED for target CV: {natural_failed}")
+		print(f"Validation of Values:\tFAILED for (distribution, CV): {natural_failed}")
 	else:
 		print("Validation of Values:\tPASSED (all numbers are natural, >= 1)")
 
-	print("-" * 44)
-	print(f"{'Target CV':>10}{'Measured CV':>13}{'Abs Diff':>11}{'Rel Diff':>10}")
-	print("-" * 44)
 
-	for result in results:
+def run_generator_tests(cvs=(0.3, 0.6, 1.0, 1.5, 2.0, 3.0), size=100_000,
+                        distribution="lognormal", mean=10_000, seed=None):
+	"""Check the target-CV generator of one distribution for several CV values."""
+	results = {cv: check_target_cv(cv, size, distribution, mean, seed) for cv in cvs}
+	valid = [r for r in results.values() if r is not None]
+
+	print(f"\n=== Generator Test: {distribution} | Size: {size} | Mean: {mean} | Seed: {seed} ===")
+	print_generator_validation(valid, size)
+
+	print("-" * 54)
+	print(f"{'Target CV':>10}{'Measured CV':>13}{'Abs Diff':>11}{'Rel Diff':>10}{'Ones':>10}")
+	print("-" * 54)
+
+	for cv, result in results.items():
+		if result is None:
+			print(f"{cv:>10.2f}{'not reachable for ' + distribution:>44}")
+			continue
+
 		print(f"{result['target_cv']:>10.2f}"
 		      f"{result['measured_cv']:>13.4f}"
 		      f"{result['abs_diff']:>11.4f}"
-		      f"{result['rel_diff']:>10.2%}")
+		      f"{result['rel_diff']:>10.2%}"
+		      f"{result['ones_share']:>10.2%}")
 
-	print("=" * 44 + "\n")
-	return results
+	print("=" * 54 + "\n")
+	return valid
+
+
+def compare_distributions(cvs=(0.3, 0.6, 1.0, 1.5, 2.0, 3.0), distributions=None,
+                          size=100_000, mean=10_000, seed=None):
+	"""Compare the measured CV of several distributions for the same target CVs and seed.
+
+	Prints two tables: the measured CV and the share of values clipped to 1.
+	"-" means the distribution cannot reach that CV.
+	"""
+	distributions = distributions or sorted(DISTRIBUTIONS)
+	results = {
+		(name, cv): check_target_cv(cv, size, name, mean, seed)
+		for name in distributions
+		for cv in cvs
+	}
+	valid = [r for r in results.values() if r is not None]
+	width = 10 + 12 * len(distributions)
+
+	def print_table(title, key, fmt):
+		print(title)
+		print("-" * width)
+		print(f"{'Target CV':>10}" + "".join(f"{name:>12}" for name in distributions))
+		print("-" * width)
+		for cv in cvs:
+			row = f"{cv:>10.2f}"
+			for name in distributions:
+				result = results[(name, cv)]
+				row += f"{'-':>12}" if result is None else f"{result[key]:>12{fmt}}"
+			print(row)
+		print("-" * width)
+
+	print(f"\n=== Distribution Comparison | Size: {size} | Mean: {mean} | Seed: {seed} ===")
+	print_generator_validation(valid, size)
+	print()
+	print_table("Measured CV:", "measured_cv", ".4f")
+	print()
+	print_table("Values clipped to 1 (share of dataset):", "ones_share", ".2%")
+	print("=" * width + "\n")
+	return valid

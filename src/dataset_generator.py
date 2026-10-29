@@ -57,7 +57,14 @@ def params_for_target_cv(distribution, cv, mean=10_000):
 		raise ValueError("cv must be positive.")
 	if mean <= 0:
 		raise ValueError("mean must be positive.")
-	return get_distribution(distribution).params_for_cv(cv, mean)
+
+	dist = get_distribution(distribution)
+	if cv > dist.max_cv:
+		raise ValueError(
+			f"{dist.name} distribution cannot reach CV={cv:.3f} "
+			f"(maximum is {dist.max_cv:.3f})."
+		)
+	return dist.params_for_cv(cv, mean)
 
 
 def discretize(value):
