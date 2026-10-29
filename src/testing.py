@@ -1,7 +1,10 @@
 import time
+import random
 import statistics
 from itertools import combinations
 from pathlib import Path
+
+from dataset_generator import generate_with_target_cv, dataset_cv
 
 
 def validate_partitions(original_dataset, partitions):
@@ -91,3 +94,64 @@ def run_tests(filepath, algorithm_func, k=2):
 
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+def validate_generated_dataset(dataset, expected_size):
+	"""Check that a generated dataset has the expected size and contains only natural numbers."""
+	size_ok = len(dataset) == expected_size
+	natural_ok = all(isinstance(x, int) and x >= 1 for x in dataset)
+	return size_ok, natural_ok
+
+
+def check_target_cv(cv, size=100_000, distribution="lognormal", mean=10_000, seed=None):
+	"""Generate one dataset with a target CV and compare it with the measured CV."""
+	rng = random.Random(seed)
+	dataset = generate_with_target_cv(size, cv, distribution, mean, rng)
+
+	size_ok, natural_ok = validate_generated_dataset(dataset, size)
+	measured_cv = dataset_cv(dataset)
+	abs_diff = abs(measured_cv - cv)
+	rel_diff = abs_diff / cv
+
+	return {
+		"target_cv": cv,
+		"measured_cv": measured_cv,
+		"abs_diff": abs_diff,
+		"rel_diff": rel_diff,
+		"size_ok": size_ok,
+		"natural_ok": natural_ok,
+	}
+
+
+def run_generator_tests(cvs=(0.3, 0.6, 1.0, 1.5, 2.0, 3.0), size=100_000,
+                        distribution="lognormal", mean=10_000, seed=None):
+	"""Check the target-CV generator for several CV values and print a report."""
+	results = [check_target_cv(cv, size, distribution, mean, seed) for cv in cvs]
+
+	size_failed = [r["target_cv"] for r in results if not r["size_ok"]]
+	natural_failed = [r["target_cv"] for r in results if not r["natural_ok"]]
+
+	print(f"\n=== Generator Test: {distribution} | Size: {size} | Mean: {mean} | Seed: {seed} ===")
+
+	if size_failed:
+		print(f"Validation of Size:\t\tFAILED for target CV: {size_failed}")
+	else:
+		print(f"Validation of Size:\t\tPASSED (every dataset has {size} numbers)")
+
+	if natural_failed:
+		print(f"Validation of Values:\tFAILED for target CV: {natural_failed}")
+	else:
+		print("Validation of Values:\tPASSED (all numbers are natural, >= 1)")
+
+	print("-" * 44)
+	print(f"{'Target CV':>10}{'Measured CV':>13}{'Abs Diff':>11}{'Rel Diff':>10}")
+	print("-" * 44)
+
+	for result in results:
+		print(f"{result['target_cv']:>10.2f}"
+		      f"{result['measured_cv']:>13.4f}"
+		      f"{result['abs_diff']:>11.4f}"
+		      f"{result['rel_diff']:>10.2%}")
+
+	print("=" * 44 + "\n")
+	return results
