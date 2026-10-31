@@ -1,6 +1,5 @@
-"""Plots for the KK vs orchestrator experiments (matplotlib)."""
-
 import math
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
@@ -19,17 +18,25 @@ def _cell_edges(values):
     return [first, *edges, last]
 
 
-def plot_mu_sigma_heatmap(grid, save_path=None, show=True, annotate=True):
+def _color_limit(grids):
+    """Largest |log_ratio| over all cells of the given grids (at least 0.1)."""
+    finite = [abs(r["log_ratio"]) for grid in grids for row in grid["results"]
+              for r in row if r is not None]
+    return max(max(finite, default=1.0), 0.1)
+
+
+def plot_mu_sigma_heatmap(grid, save_path=None, show=True, annotate=True, limit=None):
     """Heatmap of log10(D_orch / D_kk) over the (mean, std) grid.
 
-    Blue cells: orchestrator better, red cells: KK better, gray: tie.
+    Blue cells: orchestrator better, red cells: KK better, gray: tie,
+    light gray background: CV not reachable for this distribution.
     The dashed line is std = 0.6 * mean (the orchestrator's CV threshold).
+    `limit` fixes the color scale to [-limit, limit] (to compare several heatmaps).
     """
     means, stds, results = grid["means"], grid["stds"], grid["results"]
 
     values = [[math.nan if r is None else r["log_ratio"] for r in row] for row in results]
-    finite = [abs(v) for row in values for v in row if not math.isnan(v)]
-    limit = max(max(finite, default=1.0), 0.1)
+    limit = limit or _color_limit([grid])
 
     fig, ax = plt.subplots(figsize=(9, 7))
     ax.set_facecolor(UNREACHABLE_COLOR)
@@ -73,3 +80,20 @@ def plot_mu_sigma_heatmap(grid, save_path=None, show=True, annotate=True):
     if show:
         plt.show()
     return fig
+
+
+def plot_mu_sigma_heatmaps(grids, save_dir=None, show=True, annotate=True):
+    """Plot one mu-sigma heatmap per distribution with a common color scale.
+
+    `grids` is the dict returned by `run_mu_sigma_grids`. With `save_dir` every
+    heatmap is saved as <save_dir>/heatmap_mu_sigma_<distribution>.png.
+    """
+    limit = _color_limit(grids.values())
+    if save_dir:
+        Path(save_dir).mkdir(parents=True, exist_ok=True)
+
+    figures = {}
+    for name, grid in grids.items():
+        save_path = Path(save_dir) / f"heatmap_mu_sigma_{name}.png" if save_dir else None
+        figures[name] = plot_mu_sigma_heatmap(grid, save_path, show, annotate, limit)
+    return figures

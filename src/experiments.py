@@ -5,6 +5,7 @@ import time
 
 from algorithm_kk import algorithm_kk
 from dataset_generator import dataset_cv, generate_with_target_cv
+from distributions import DISTRIBUTIONS, get_distribution
 from orchestrator import orchestrator_partitioning
 from testing import partition_metrics
 
@@ -27,16 +28,18 @@ def run_grid_point(mean, std, n=100, k=4, num_datasets=20,
                    distribution="lognormal", seed=None):
     """Compare KK and the orchestrator on datasets with the given mean and std.
 
+    `distribution` is a key of DISTRIBUTIONS (e.g. "lognormal", "gamma", "uniform");
+    an unknown name raises ValueError.
     Returns None when the distribution cannot reach CV = std / mean.
     """
+    dist = get_distribution(distribution)
     cv = std / mean
-    rng = random.Random(seed)
-
-    try:
-        datasets = [generate_with_target_cv(n, cv, distribution, mean, rng)
-                    for _ in range(num_datasets)]
-    except ValueError:
+    if cv > dist.max_cv:
         return None
+
+    rng = random.Random(seed)
+    datasets = [generate_with_target_cv(n, cv, dist.name, mean, rng)
+                for _ in range(num_datasets)]
 
     kk_results = [run_algorithm(algorithm_kk, d, k) for d in datasets]
     orch_results = [run_algorithm(orchestrator_partitioning, d, k) for d in datasets]
@@ -47,6 +50,7 @@ def run_grid_point(mean, std, n=100, k=4, num_datasets=20,
     mean_log_ratio = statistics.mean(log_ratios)
 
     return {
+        "distribution": dist.name,
         "mean": mean,
         "std": std,
         "target_cv": cv,
@@ -97,6 +101,7 @@ def run_mu_sigma_grid(means=range(1000, 10_001, 1000), stds=range(1000, 15_001, 
     Returns a dict with the settings and `results[i][j]` for stds[i], means[j]
     (None where the distribution cannot reach CV = std / mean).
     """
+    distribution = get_distribution(distribution).name
     means, stds = list(means), list(stds)
     results = []
 
@@ -116,3 +121,19 @@ def run_mu_sigma_grid(means=range(1000, 10_001, 1000), stds=range(1000, 15_001, 
         "seed": seed,
         "results": results,
     }
+
+
+def run_mu_sigma_grids(distributions=None, **grid_kwargs):
+    """Run `run_mu_sigma_grid` for several distributions with the same settings.
+
+    `distributions` is a list of keys of DISTRIBUTIONS (default: all of them);
+    `grid_kwargs` are passed to `run_mu_sigma_grid` (means, stds, n, k, ...).
+    Returns a dict {distribution name: grid}.
+    """
+    names = [get_distribution(name).name for name in (distributions or DISTRIBUTIONS)]
+
+    grids = {}
+    for name in names:
+        print(f"\n--- Distribution: {name} ---")
+        grids[name] = run_mu_sigma_grid(distribution=name, **grid_kwargs)
+    return grids
