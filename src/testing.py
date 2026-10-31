@@ -215,3 +215,22 @@ def compare_distributions(cvs=(0.3, 0.6, 1.0, 1.5, 2.0, 3.0), distributions=None
 	print_table("Values clipped to 1 (share of dataset):", "ones_share", ".2%")
 	print("=" * width + "\n")
 	return valid
+
+
+def partition_metrics(dataset, partitions, k):
+	"""Return partition quality metrics:
+	max_diff   – largest partition sum minus smallest partition sum
+	std_max    – max_diff / total sum (same as in process_single_dataset)
+	valid      – whether all original numbers are preserved
+	"""
+	valid = len(partitions) == k and validate_partitions(dataset, partitions)
+
+	sums = [sum(p) for p in partitions]
+	total_sum = sum(sums)
+	max_diff = max(sums) - min(sums) if sums else 0
+
+	return {
+		"valid": valid,
+		"max_diff": max_diff,
+		"std_max": max_diff / total_sum if total_sum else 0.0,
+	}
