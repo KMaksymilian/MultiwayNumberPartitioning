@@ -123,17 +123,77 @@ def run_mu_sigma_grid(means=range(1000, 10_001, 1000), stds=range(1000, 15_001, 
     }
 
 
-def run_mu_sigma_grids(distributions=None, **grid_kwargs):
-    """Run `run_mu_sigma_grid` for several distributions with the same settings.
+def run_for_distributions(experiment, distributions=None, **kwargs):
+    """Run `experiment(distribution=name, **kwargs)` for several distributions.
 
-    `distributions` is a list of keys of DISTRIBUTIONS (default: all of them);
-    `grid_kwargs` are passed to `run_mu_sigma_grid` (means, stds, n, k, ...).
-    Returns a dict {distribution name: grid}.
+    `distributions` is a list of keys of DISTRIBUTIONS (default: all of them).
+    Returns a dict {distribution name: result of the experiment}.
     """
     names = [get_distribution(name).name for name in (distributions or DISTRIBUTIONS)]
 
-    grids = {}
+    results = {}
     for name in names:
         print(f"\n--- Distribution: {name} ---")
-        grids[name] = run_mu_sigma_grid(distribution=name, **grid_kwargs)
-    return grids
+        results[name] = experiment(distribution=name, **kwargs)
+    return results
+
+
+def run_mu_sigma_grids(distributions=None, **grid_kwargs):
+    """Run `run_mu_sigma_grid` for several distributions with the same settings.
+
+    `grid_kwargs` are passed to `run_mu_sigma_grid` (means, stds, n, k, ...).
+    Returns a dict {distribution name: grid}.
+    """
+    return run_for_distributions(run_mu_sigma_grid, distributions, **grid_kwargs)
+
+
+def run_cv_sweep(cvs=None, mean=10_000, n=100, k=4, num_datasets=10,
+                 distribution="lognormal", seed=None):
+    """Run KK and the orchestrator on datasets with many target CV values.
+    CV values that the distribution cannot reach are skipped.
+
+    Returns a dict with the settings and `records`: one dict per dataset with its
+    measured CV, D and running time of both algorithms.
+    """
+    dist = get_distribution(distribution)
+    if cvs is None:
+        cvs = [round(0.1 * i, 1) for i in range(1, 31)]  # 0.1, 0.2, ..., 3.0
+
+    rng = random.Random(seed)
+    records = []
+
+    for cv in cvs:
+        if cv > dist.max_cv:
+            continue
+
+        for _ in range(num_datasets):
+            dataset = generate_with_target_cv(n, cv, dist.name, mean, rng)
+            kk = run_algorithm(algorithm_kk, dataset, k)
+            orch = run_algorithm(orchestrator_partitioning, dataset, k)
+            records.append({
+                "target_cv": cv,
+                "measured_cv": dataset_cv(dataset),
+                "kk_d": kk["max_diff"],
+                "orch_d": orch["max_diff"],
+                "kk_time": kk["time"],
+                "orch_time": orch["time"],
+            })
+
+    print(f"CV sweep done: {len(records)} datasets")
+    return {
+        "mean": mean,
+        "n": n,
+        "k": k,
+        "num_datasets": num_datasets,
+        "distribution": dist.name,
+        "seed": seed,
+        "records": records,
+    }
+
+
+def run_cv_sweeps(distributions=None, **sweep_kwargs):
+    """Run `run_cv_sweep` for several distributions with the same settings.
+
+    Returns a dict {distribution name: sweep}.
+    """
+    return run_for_distributions(run_cv_sweep, distributions, **sweep_kwargs)
