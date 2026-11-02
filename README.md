@@ -115,6 +115,10 @@ The default CV threshold is `0.6`.
 8. Distribute the remaining smaller numbers using GNP.
 9. Validate the final partitioning result.
 
+The initial whole-dataset CV check is unchanged. Standalone LP does not enable
+these pruning constraints by default. An empty extracted group returns empty
+partitions without solving a model. The existing solver time limit still applies.
+
 The orchestrator is designed to combine the strengths of different methods without changing their underlying implementations.
 
 ## 3. Project Structure
@@ -319,6 +323,61 @@ The testing module calculates average metrics across the processed datasets and 
 When comparing algorithms, the program identifies:
 - The algorithm with the lowest average maximum standardized difference
 - The algorithm with the lowest average execution time
+
+### Regression Tests
+
+Run the automated tests from the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The tests cover known optimal MILP partitions, duplicate preservation, the
+required number of groups, invalid inputs, and orchestrator fallback behavior.
+They use the standard-library test runner and the project's PuLP/HiGHS dependencies.
+
+Benchmark input must contain exactly the number of datasets declared in its
+header. Invalid partitions and algorithm failures raise errors instead of
+silently omitting results. LP fallback in the orchestrator logs its cause.
+
+### Reproducible Experiments
+
+The CLI runs each dataset three times by default. Set the number of repetitions,
+the solver time limit in seconds, the orchestrator CV threshold, and a CSV path:
+
+```bash
+python src/main.py --algorithm all -k 4 --repeats 5 --time-limit 1 --cv-threshold 0.6 --csv results/comparison.csv
+```
+
+CSV output overwrites the specified file and contains one row per dataset,
+algorithm and repetition. Rows include normalized quality metrics, elapsed time,
+dataset size and SHA-256, Python/PuLP/HiGHS versions, experiment parameters,
+selected strategy, LP status, optimality flag and fallback reason. Console reports
+aggregate all repetitions and count the strategies and solver statuses. Errors
+abort the experiment; CSV is written only after the requested runs succeed.
+
+`lp_optimal` refers to the LP model's scope: `full_dataset` for standalone LP,
+and `large_numbers` for the orchestrator. An optimal large-number partition does
+not prove that the final hybrid partition is optimal. `TimeLimit` with a feasible
+solution is accepted and is not reported as proven optimal. `NotRun` means no
+solver execution took place; `Error` indicates failure before a solver status
+was available. The solver uses one thread and random seed zero; time limits and
+elapsed times can still cause differences across machines and runs.
+
+Generate repeatable input files using a fixed seed:
+
+```bash
+python src/main.py --generate --seed 42
+```
+
+This replaces the standard files in `examples/`, including the million-number
+datasets. The seed controls generation only; it does not change existing input
+files when benchmarking. Keep the generated datasets to reproduce experiments;
+their CSV checksums identify their exact contents.
+
+Small-case regression tests enumerate all assignments independently of the
+solver and compare MILP results against the true minimum range. GitHub Actions
+runs the tests on Windows and Linux with dependencies from `uv.lock`.
 
 ## 8. Limitations
 
