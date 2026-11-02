@@ -50,6 +50,12 @@ def find_biggest(big_partitions):
 
 def algorithm_kk(numbers, k):
     """Partition numbers using the Karmarkar-Karp algorithm."""
+    if k < 1:
+        raise ValueError("k must be greater than zero.")
+    if any(number < 0 for number in numbers):
+        raise ValueError("KK requires non-negative data.")
+    if not numbers:
+        return [[] for _ in range(k)]
     heap = []
 
     for number in numbers:
