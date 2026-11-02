@@ -3,23 +3,25 @@ import argparse
 from pathlib import Path
 
 
-def generate_dataset(size, balance=1.0, lower_scope=(1, 1000), upper_scope=(2000, 20000)):
+def generate_dataset(size, balance=1.0, lower_scope=(1, 1000), upper_scope=(2000, 20000), *, rng=None):
     """Generate a random dataset with adjustable balance."""
     dataset = []
+    rng = rng if rng is not None else random.Random()
 
     for _ in range(size):
-        if random.random() < balance:
-            dataset.append(random.randint(*lower_scope))
+        if rng.random() < balance:
+            dataset.append(rng.randint(*lower_scope))
         else:
-            dataset.append(random.randint(*upper_scope))
+            dataset.append(rng.randint(*upper_scope))
 
-    random.shuffle(dataset)
+    rng.shuffle(dataset)
     return dataset
 
 
-def export_datasets(filename, num_datasets=10, datasets_sizes=[10], balance=1.0, path="examples"):
+def export_datasets(filename, num_datasets=10, datasets_sizes=(10,), balance=1.0, path="examples", *, seed=0):
     """Generate and save datasets to a file."""
     try:
+        rng = random.Random(seed)
         Path(path).mkdir(parents=True, exist_ok=True)
 
         full_path = Path(path) / filename
@@ -28,13 +30,13 @@ def export_datasets(filename, num_datasets=10, datasets_sizes=[10], balance=1.0,
 
             for i in range(num_datasets):
                 size = datasets_sizes[i % len(datasets_sizes)]
-                dataset = generate_dataset(size, balance)
+                dataset = generate_dataset(size, balance, rng=rng)
                 line = " ".join(map(str, dataset))
                 f.write(f"{line}\n")
 
         print(f"Successfully created dataset: {filename}")
     except Exception as e:
-        print(f"Error encountered: {e}")
+        raise RuntimeError(f"Dataset generation failed: {e}") from e
 
 
 if __name__ == "__main__":
