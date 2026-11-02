@@ -109,11 +109,17 @@ The default CV threshold is `0.6`.
    \]
 
 4. Numbers greater than or equal to `T` are classified as large numbers.
-5. Calculate the CV of the large-number group.
-6. Apply KK or LP to the large-number group, depending on its CV.
+5. Always invoke LP on the large-number group, including singleton groups.
+6. For this reduced instance only, use the better KK/GNP partition as a MIP
+   start and range cutoff, bound each group sum using that cutoff, and order
+   group sums to reduce symmetry. All bounds use only the extracted numbers.
 7. If LP fails or produces an invalid result, fall back to KK.
 8. Distribute the remaining smaller numbers using GNP.
 9. Validate the final partitioning result.
+
+The initial whole-dataset CV check is unchanged. Standalone LP does not enable
+these pruning constraints by default. An empty extracted group returns empty
+partitions without solving a model. The existing solver time limit still applies.
 
 The orchestrator is designed to combine the strengths of different methods without changing their underlying implementations.
 
@@ -359,13 +365,6 @@ solution is accepted and is not reported as proven optimal. `NotRun` means no
 solver execution took place; `Error` indicates failure before a solver status
 was available. The solver uses one thread and random seed zero; time limits and
 elapsed times can still cause differences across machines and runs.
-
-Before building an LP model, KK and then, if necessary, GNP are checked for a
-zero-range partition of that model's input. A zero range proves optimality and
-returns immediately without building or solving the MILP. This is reported as
-`HeuristicOptimal`, with `lp_optimal=True` and `lp_attempted=False`. The check is
-skipped if the input sum is not divisible by the number of groups, since a zero
-range is then impossible. A perfect KK partition also skips the GNP call.
 
 Generate repeatable input files using a fixed seed:
 
