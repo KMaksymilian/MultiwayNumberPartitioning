@@ -29,7 +29,7 @@ def _color_limit(grids):
 
 
 def plot_mu_sigma_heatmap(grid, save_path=None, show=True, annotate=True, limit=None):
-    """Heatmap of log10(D_orch / D_kk) over the (mean, std) grid.
+    """Heatmap of log10((D_orch + 1) / (D_kk + 1)) over the (mean, std) grid.
 
     Blue cells: orchestrator better, red cells: KK better, gray: tie,
     light gray background: CV not reachable for this distribution.
@@ -68,14 +68,14 @@ def plot_mu_sigma_heatmap(grid, save_path=None, show=True, annotate=True, limit=
     ax.set_xlabel("Mean of the data (μ)")
     ax.set_ylabel("Standard deviation of the data (σ)")
     ax.set_title(
-        f"Orchestrator vs KK: mean log10(D_orch / D_kk)\n"
+        f"Orchestrator vs KK: mean log10((D_orch + 1) / (D_kk + 1))\n"
         f"{grid['distribution']}, n = {grid['n']}, k = {grid['k']}, "
         f"{grid['num_datasets']} datasets per cell, seed = {grid['seed']}"
     )
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.09), frameon=False)
 
     colorbar = fig.colorbar(mesh, ax=ax)
-    colorbar.set_label("log10(D_orch / D_kk)   (< 0: orchestrator better, > 0: KK better)")
+    colorbar.set_label("log10((D_orch + 1) / (D_kk + 1))   (< 0: orchestrator better, > 0: KK better)")
 
     fig.tight_layout()
     if save_path:

@@ -77,7 +77,10 @@ def orchestrator_partitioning(
                                   metadata=metadata, pruning=True)
         if not _is_valid_partition(basket2_large, partitions, k):
             raise RuntimeError("Invalid LP result.")
+        if metadata["lp_status"] == "HeuristicOptimal":
+            metadata["strategy"] = "heuristic+gnp"
     except Exception as error:
+        metadata["lp_optimal"] = False
         if metadata["lp_status"] == "NotRun":
             metadata["lp_status"] = "Error"
         metadata.update(strategy="kk+gnp_fallback", fallback_reason=str(error))

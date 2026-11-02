@@ -56,7 +56,7 @@ class PruningTests(unittest.TestCase):
             return solve(problem, solver)
 
         with patch.object(pulp.LpProblem, "solve", check_start):
-            algorithm_lp([0, 5, 5, 8, 8, 13], 3, pruning=True)
+            algorithm_lp([0, 5, 5, 8, 8, 14], 3, pruning=True)
         self.assertEqual(checked, [True])
 
     def test_orchestrator_always_optimizes_extracted_subset(self):
