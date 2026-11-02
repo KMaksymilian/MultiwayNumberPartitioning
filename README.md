@@ -115,10 +115,6 @@ The default CV threshold is `0.6`.
 8. Distribute the remaining smaller numbers using GNP.
 9. Validate the final partitioning result.
 
-The initial whole-dataset CV check is unchanged. Standalone LP does not enable
-these pruning constraints by default. An empty extracted group returns empty
-partitions without solving a model. The existing solver time limit still applies.
-
 The orchestrator is designed to combine the strengths of different methods without changing their underlying implementations.
 
 ## 3. Project Structure

@@ -37,7 +37,6 @@ def export_datasets(filename, num_datasets=10, datasets_sizes=(10,), balance=1.0
 
         print(f"Successfully created dataset: {filename}")
     except Exception as e:
-        print(f"Error encountered: {e}")
         raise RuntimeError(f"Dataset generation failed: {e}") from e
 
 def dataset_cv(dataset):
@@ -89,8 +88,6 @@ def generate_with_target_cv(size, cv, distribution="lognormal", mean=10_000, rng
 	 (look at discretize(value) and run_generator_tests in testing.py)."""
 	params = params_for_target_cv(distribution, cv, mean)
 	return generate_distribution_dataset(size, distribution, rng=rng, **params)
-        
-
 
 if __name__ == "__main__":
     # Standard datasets
