@@ -10,6 +10,13 @@ from orchestrator import orchestrator_partitioning
 from testing import partition_metrics
 
 
+def _validate_settings(mean, n, k, num_datasets):
+    if not math.isfinite(mean) or mean <= 0:
+        raise ValueError("mean must be finite and positive.")
+    if n < 2 or k < 1 or num_datasets < 1:
+        raise ValueError("n must be at least 2, k and num_datasets must be positive.")
+
+
 def run_algorithm(algorithm_func, dataset, k):
     """Run one algorithm on a copy of the dataset and return its metrics and time."""
     start_time = time.perf_counter()
@@ -32,6 +39,9 @@ def run_grid_point(mean, std, n=100, k=4, num_datasets=20,
     an unknown name raises ValueError.
     Returns None when the distribution cannot reach CV = std / mean.
     """
+    _validate_settings(mean, n, k, num_datasets)
+    if not math.isfinite(std) or std <= 0:
+        raise ValueError("std must be finite and positive.")
     dist = get_distribution(distribution)
     cv = std / mean
     if cv > dist.max_cv:
@@ -88,8 +98,8 @@ def print_grid_point(result):
     print(f"{'Wins':16}{result['kk_wins']:>14.0%}{result['orch_wins']:>14.0%}")
     print("-" * 44)
     print(f"|D_orch - D_kk| (mean):\t\t{result['d_abs_diff']:.1f}")
-    print(f"D_orch / D_kk (geometric mean):\t{result['d_ratio']:.2f}")
-    print(f"log10(D_orch / D_kk) (mean):\t{result['log_ratio']:+.3f}")
+    print(f"(D_orch + 1) / (D_kk + 1) (geometric mean):\t{result['d_ratio']:.2f}")
+    print(f"log10((D_orch + 1) / (D_kk + 1)) (mean):\t{result['log_ratio']:+.3f}")
     print(f"Ties:\t\t\t\t{result['ties']:.0%}")
 
 
@@ -155,6 +165,7 @@ def run_cv_sweep(cvs=None, mean=10_000, n=100, k=4, num_datasets=10,
     Returns a dict with the settings and `records`: one dict per dataset with its
     measured CV, D and running time of both algorithms.
     """
+    _validate_settings(mean, n, k, num_datasets)
     dist = get_distribution(distribution)
     if cvs is None:
         cvs = [round(0.1 * i, 1) for i in range(1, 31)]  # 0.1, 0.2, ..., 3.0

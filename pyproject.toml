@@ -6,3 +6,6 @@ dependencies = [
     "highspy>=1.15.1",
     "pulp>=4.0.0",
 ]
+
+[project.optional-dependencies]
+plots = ["matplotlib>=3.10,<4"]

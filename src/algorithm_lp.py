@@ -13,15 +13,19 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None, pruning
     if not math.isfinite(time_limit) or time_limit <= 0:
         raise ValueError("time_limit must be finite and greater than zero.")
     if metadata is not None:
-        metadata.update(lp_status="NotRun", lp_optimal=False, pruning_enabled=pruning)
+        metadata.update(lp_status="NotRun", lp_optimal=False, pruning_enabled=pruning,
+                        lp_attempted=False)
     if any(number < 0 for number in A):
         raise ValueError("LP requires non-negative data.")
     if not A:
         return [[] for _ in range(k)]
 
     if pruning:
-        candidates = [algorithm_kk(A, k), algorithm_gnp(A, [0] * k)]
-        initial = min(candidates, key=lambda groups: max(map(sum, groups)) - min(map(sum, groups)))
+        initial = algorithm_kk(A, k)
+        if len(set(map(sum, initial))) > 1:
+            greedy = algorithm_gnp(A, [0] * k)
+            initial = min([initial, greedy],
+                          key=lambda groups: max(map(sum, groups)) - min(map(sum, groups)))
         # Use the same labeling convention for the MIP start and symmetry constraints.
         initial = sorted(initial, key=sum, reverse=True)
         initial_sums = list(map(sum, initial))
@@ -32,6 +36,10 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None, pruning
         if metadata is not None:
             metadata.update(initial_range=upper_range, sum_lower_bound=lower_sum,
                             sum_upper_bound=upper_sum)
+        if upper_range == 0:
+            if metadata is not None:
+                metadata.update(lp_status="HeuristicOptimal", lp_optimal=True)
+            return initial
 
     n = len(A)
     rn = range(n)
@@ -90,11 +98,13 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None, pruning
     # Solve with a one-second time limit.
     solver = pulp.HiGHS(msg=False, timeLimit=time_limit, threads=1, random_seed=0,
                         warmStart=pruning)
+    if metadata is not None:
+        metadata["lp_attempted"] = True
     result = prob.solve(solver)
     if metadata is not None:
         metadata.update(
             lp_status=result.status.name,
-            lp_optimal=result.status == LpSolveStatus.Optimal,
+            lp_optimal=False,
         )
 
     if not result.has_solution:
@@ -119,4 +129,6 @@ def algorithm_lp(A: list[int], k: int, *, time_limit=1.0, metadata=None, pruning
     if sorted(x for p in partitions for x in p) != sorted(A):
         raise RuntimeError("Solver returned an incomplete partition.")
 
+    if metadata is not None:
+        metadata["lp_optimal"] = result.status == LpSolveStatus.Optimal
     return partitions

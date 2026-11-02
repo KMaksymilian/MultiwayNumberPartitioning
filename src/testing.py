@@ -1,8 +1,11 @@
 import time
+import random
 import statistics
 from collections import Counter
 from itertools import combinations
 from pathlib import Path
+from dataset_generator import dataset_cv, generate_with_target_cv
+from distributions import DISTRIBUTIONS
 
 
 def validate_partitions(original_dataset, partitions, k):
@@ -240,7 +243,7 @@ def partition_metrics(dataset, partitions, k):
 	std_max    – max_diff / total sum (same as in process_single_dataset)
 	valid      – whether all original numbers are preserved
 	"""
-	valid = len(partitions) == k and validate_partitions(dataset, partitions)
+	valid = validate_partitions(dataset, partitions, k)
 
 	sums = [sum(p) for p in partitions]
 	total_sum = sum(sums)

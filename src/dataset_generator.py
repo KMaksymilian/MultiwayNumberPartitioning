@@ -1,7 +1,9 @@
 import random
 import argparse
 import statistics
+import math
 from pathlib import Path
+from distributions import get_distribution
 
 
 def generate_dataset(size, balance=1.0, lower_scope=(1, 1000), upper_scope=(2000, 20000), *, rng=None):
@@ -53,9 +55,9 @@ def dataset_cv(dataset):
 
 def params_for_target_cv(distribution, cv, mean=10_000):
 	"""Return parameters of `distribution` for the requested CV and mean."""
-	if cv <= 0:
+	if not math.isfinite(cv) or cv <= 0:
 		raise ValueError("cv must be positive.")
-	if mean <= 0:
+	if not math.isfinite(mean) or mean <= 0:
 		raise ValueError("mean must be positive.")
 
 	dist = get_distribution(distribution)

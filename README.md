@@ -375,6 +375,25 @@ Small-case regression tests enumerate all assignments independently of the
 solver and compare MILP results against the true minimum range. GitHub Actions
 runs the tests on Windows and Linux with dependencies from `uv.lock`.
 
+### Distribution Experiments and Plots
+
+Install the optional plotting dependencies from the lockfile:
+
+```bash
+uv sync --locked --extra plots
+uv run --frozen --extra plots python -m unittest discover -s tests -v
+```
+
+`experiments.py` exposes the mean/standard-deviation grid and CV sweep functions.
+`plots.py` uses Matplotlib, which is provided by the `plots` extra. Heatmaps and
+ratio reports use `(D_orch + 1) / (D_kk + 1)` to support zero-range partitions;
+this smoothed ratio is not the raw `D_orch / D_kk` ratio.
+
+With pruning enabled, a zero-range KK/GNP candidate returns before constructing
+the MILP. Metadata reports `HeuristicOptimal`, `lp_attempted=False` and, in the
+orchestrator, strategy `heuristic+gnp`. Optimality applies only to the extracted
+subproblem; the remaining numbers are still distributed by GNP.
+
 ## 8. Limitations
 
 - The KK and GNP algorithms are heuristic methods and do not guarantee optimal partitions.
