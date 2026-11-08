@@ -51,33 +51,31 @@ Jeśli optymalny próg wyraźnie zależy od $n$ lub $k$, to samo CV nie wystarcz
 ```sh
 cd src && uv run python experiments_cv.py
 ```
-Domyślnie jest to 30 wartości CV × 10 zbiorów dla każdego rozkładu, a jedno wywołanie LP może trwać do `time_limit = 1` s. Pełne badanie zajmuje więc kilkanaście minut. Mniejszy przebieg:
+Domyślnie jest to 30 wartości CV × 10 zbiorów dla każdego rozkładu, a jedno wywołanie LP może trwać do `time_limit = 1` s. Pełne badanie zajmuje około dziesięć minut:
 ```python
 from experiments_cv import run_threshold_study, print_threshold_study
-
-study = run_threshold_study(distributions=["lognormal", "gamma"], ks=(3,),
-                            cvs=[0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0],
-                            n=40, num_datasets=4, time_limit=0.3, seed=0)
+study = run_threshold_study(ks=(3, 5), n=100, num_datasets=10, time_limit=1, seed=0)
 print_threshold_study(study)
 ```
 
-## 6. Wstępne wyniki
-Mała próba z punktu 5 (rozkłady lognormal i gamma, $k = 3$, $n = 40$, 4 zbiory na wartość CV, koszt $D/\sum$):
+## 6. Wyniki
+Badanie na większych danych: rozkłady lognormal, gamma i uniform, $k \in \{3, 5\}$, $n = 100$, 10 zbiorów na wartość CV, `time_limit = 1` s, koszt $D/\sum$, `seed = 0`:
+```python
+run_threshold_study(ks=(3, 5), n=100, num_datasets=10, time_limit=1, seed=0)
+```
 
-| Scenariusz | $\tau^*$ | 95% CI | regret (test) | $\tau = 0{,}6$ | zawsze KK | zawsze LP+GNP |
-|---|---|---|---|---|---|---|
-| lognormal | 1,82 | [1,74; 1,82] | 1,7e-05 | 9,7e-04 | 0 | 4,2e-03 |
-| gamma | 2,22 | [2,15; 2,22] | 4,5e-06 | 4,4e-04 | ≈0 | 3,2e-03 |
+| Scenariusz     | $\tau^*$ | 95% CI       | regret (test) | $\tau = 0{,}6$ | zawsze KK | zawsze LP+GNP |
+| -------------- | -------- | ------------ | ------------- | -------------- | --------- | ------------- |
+| lognormal, k=3 | 4,50     | [3,93; 4,59] | 3,3e-06       | 2,8e-04        | 3,3e-06   | 7,3e-04       |
+| gamma, k=3     | 2,73     | [2,30; 3,86] | 5,0e-07       | 7,5e-05        | 4,8e-07   | 4,7e-04       |
+| uniform, k=3   | 0,60     | [0,56; 0,60] | 3,5e-05       | ≈0             | ≈0        | 2,4e-03       |
+| lognormal, k=5 | 4,50     | [3,39; 4,59] | 0             | 4,5e-04        | ≈0        | 8,5e-04       |
+| gamma, k=5     | 2,67     | [2,41; 2,87] | 2,9e-07       | 9,7e-05        | 2,9e-07   | 3,6e-04       |
+| uniform, k=5   | 0,60     | [0,56; 0,60] | 1,2e-05       | ≈0             | ≈0        | 2,7e-04       |
+| łącznie        | 4,26     | [3,86; 4,26] | 9,4e-07       | 2,1e-04        | 9,4e-07   | 6,6e-04       |
 
-Najlepszy próg wypada na największym zmierzonym CV, czyli w praktyce wybierana jest strategia „zawsze KK”. Ręczne sprawdzenie pojedynczych instancji potwierdza, że LP faktycznie się wykonuje (status `Optimal` lub `TimeLimit`), a mimo to KK daje wyraźnie mniejszy rozstęp:
+Próg minimax wynosi $4{,}26$ (najgorszy średni regret $3{,}3 \cdot 10^{-6}$).
 
-| $n$ | CV | $D$ (LP+GNP) | $D$ (KK) |
-|---|---|---|---|
-| 40 | 0,4 | 3262 | 11 |
-| 40 | 2,0 | 463 | 17 |
-| 100 | 1,0 | 1012 | 4 |
-| 100 | 2,0 | 104 | 5 |
-
-LP dzieli duże liczby optymalnie, ale GNP rozkłada pozostałe liczby gorzej niż KK. Przy kryterium samego rozstępu ścieżka LP+GNP nie wygrywa więc w żadnym zbadanym zakresie CV, a próg $0{,}6$ daje regret o 1–2 rzędy wielkości większy niż „zawsze KK”.
-
-Próba była mała, więc wynik wymaga potwierdzenia w pełnym badaniu, z większym $n$, różnymi $k$ i ewentualnie z kosztem uwzględniającym czas ($\lambda > 0$).
+- Dla lognormal i gamma $\tau^*$ leży na największym zmierzonym CV lub blisko niego, więc w praktyce wybierana jest strategia „zawsze KK". Próg $0{,}6$ ma regret o 2–3 rzędy wielkości większy, a „zawsze LP+GNP" jest jeszcze gorsza.
+- Dla uniform wychodzi $\tau^* = 0{,}6$, ale „zawsze KK" ma regret ≈0. Zakres CV tego rozkładu jest wąski (po 50 zbiorów na scenariusz), więc krzywa regretu jest płaska i wybór progu jest tam mało wiarygodny.
+- Różnice między $k = 3$ i $k = 5$ są małe, a przedziały ufności $\tau^*$ się pokrywają. Nie widać wyraźnej zależności progu od $k$.
