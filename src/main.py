@@ -12,6 +12,7 @@ from algorithm_gnp import algorithm_gnp
 from orchestrator import orchestrator_partitioning
 from dataset_generator import export_datasets
 from testing import run_tests
+from lab_output import write_lab_output
 
 
 def run_gnp(dataset, k):
@@ -179,6 +180,8 @@ def main():
     parser.add_argument("--time-limit", type=float, default=1.0, help="Solver time limit in seconds")
     parser.add_argument("--seed", type=int, default=0, help="Dataset generation seed (default: 0)")
     parser.add_argument("--csv", type=Path, help="Write per-run results to CSV (overwrites file)")
+    parser.add_argument("--lab", action="store_true",
+                        help="Save partitions to <dataset>_output.txt instead of benchmarking")
     args = parser.parse_args()
 
     if args.k < 1:
@@ -189,6 +192,11 @@ def main():
         parser.error("time-limit must be finite and greater than zero.")
     if not math.isfinite(args.cv_threshold) or args.cv_threshold < 0:
         parser.error("cv-threshold must be finite and non-negative.")
+
+    if args.lab and (args.generate or args.csv or args.algorithm == "all"):
+        parser.error("--lab requires one explicit algorithm and cannot be combined with --generate or --csv.")
+    if args.lab and args.cv_threshold > 1:
+        parser.error("--cv-threshold must be between 0 and 1 in lab mode.")
 
     if args.generate:
         generate_datasets(args.seed)
@@ -202,6 +210,20 @@ def main():
             f"Dataset file not found: {filepath}\n"
             "Generate datasets first using --generate."
         )
+
+    if args.lab:
+        algorithm = ALGORITHMS[args.algorithm]
+        options = {}
+        if args.algorithm in ("lp", "orchestrator"):
+            options["time_limit"] = args.time_limit
+        if args.algorithm == "orchestrator":
+            options["cv_threshold"] = args.cv_threshold
+        try:
+            result = write_lab_output(filepath, args.k, algorithm, **options)
+        except (OSError, ValueError, RuntimeError) as error:
+            parser.exit(1, f"Error: {error}\n")
+        print(f"Results saved to {result}")
+        return
 
     if args.csv and args.csv.resolve() == filepath.resolve():
         parser.error("CSV output must not overwrite the input dataset.")
