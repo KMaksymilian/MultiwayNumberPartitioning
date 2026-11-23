@@ -309,3 +309,159 @@ def plot_ratio_vs_cv(sweeps, points_per_bin=15, save_path=None, show=True):
     if show:
         plt.show()
     return fig
+
+
+# ---------------------------------------------------------------------------
+# Scaling: time and quality against n and against the number of digits
+# ---------------------------------------------------------------------------
+
+SCALING_STYLES = {
+    "KK": {"color": "#2a78d6", "marker": "o", "linestyle": "-"},
+    "GNP": {"color": "#1baf7a", "marker": "s", "linestyle": "--"},
+    "LP": {"color": "#8c6bb1", "marker": "D", "linestyle": ":"},
+    "LP z pruningiem": {"color": "#eda100", "marker": "P", "linestyle": "-."},
+    "LP+GNP": {"color": "#e87ba4", "marker": "v", "linestyle": "--"},
+    # hollow markers and a dashed line, so KK stays visible where both coincide
+    "Orkiestrator": {"color": "#eb6834", "marker": "^", "linestyle": (0, (4, 2)),
+                     "hollow": True},
+}
+SCALING_METRICS = {
+    "time": {"ylabel": "Czas działania [s] (skala log.)"},
+    "quality": {"ylabel": r"Względna rozpiętość $\log_{10}((D+1)/\Sigma)$"},
+}
+SCALING_X = {"size": ("n", "Liczba elementów n (skala log.)"),
+             "digits": ("digits", "Liczba cyfr c (skala log.)")}
+SCALING_MIN_RUNS = 3  # a point is drawn only when at least this many repetitions are usable
+
+
+def _usable_scaling_run(r):
+    """Successful run that really used its algorithm (no LP -> KK fallback)."""
+    return r["status"] == "ok" and r.get("strategy") != "kk+gnp_fallback"
+
+
+def plot_scaling(results, experiment, metric, scenario, k, save_path=None, show=True):
+    """Time or quality of every algorithm against n (experiment "size") or the
+    number of digits (experiment "digits"), for one scenario and one k.
+
+    Line: median of the repetitions; band: 25th-75th percentile. Runs with an
+    error or with the LP -> KK fallback are left out, so a line ends where the
+    algorithm stops working. For quality, the grey dotted line is log10(1 / sum),
+    the value reached at D = 0.
+    """
+    x_key, x_label = SCALING_X[experiment]
+    selected = [r for r in results["records"]
+                if (r["scenario"], r["experiment"], r["k"]) == (scenario, experiment, k)]
+    key = "time" if metric == "time" else "log10_rel"
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+
+    for name in results["algorithms"]:
+        style = SCALING_STYLES[name]
+        points = {}
+        for r in selected:
+            if r["algorithm"] == name and _usable_scaling_run(r):
+                points.setdefault(r[x_key], []).append(r[key])
+        xs = sorted(x for x, ys in points.items() if len(ys) >= SCALING_MIN_RUNS)
+        if not xs:
+            continue
+        quartiles = [statistics.quantiles(points[x], n=4, method="inclusive") for x in xs]
+        ax.fill_between(xs, [q[0] for q in quartiles], [q[2] for q in quartiles],
+                        color=style["color"], alpha=0.12, linewidth=0)
+        hollow = style.get("hollow", False)
+        ax.plot(xs, [q[1] for q in quartiles], color=style["color"], marker=style["marker"],
+                linestyle=style["linestyle"], linewidth=1.6 if hollow else 2,
+                markersize=8 if hollow else 6, markerfacecolor="none" if hollow else style["color"],
+                markeredgewidth=1.5, zorder=3 if hollow else 2, label=name)
+
+    if metric == "quality":
+        floor = {}
+        for r in selected:
+            floor.setdefault(r[x_key], []).append(-r["log10_sum"])
+        bottom, top = ax.get_ylim()
+        xs = sorted(floor)
+        ax.plot(xs, [statistics.median(floor[x]) for x in xs], color="#6f6f6f",
+                linestyle=":", linewidth=1.5, label="D = 0")
+        ax.set_ylim(bottom, top)  # the line may leave the plot far below the data
+
+    ax.set_xscale("log")
+    if metric == "time":
+        ax.set_yscale("log")
+    label = results["scenarios"][scenario]
+    ax.set_title(f"{label[0].upper()}{label[1:]}, k = {k}", fontsize=11)
+    ax.set_xlabel(x_label, fontsize=11)
+    ax.set_ylabel(SCALING_METRICS[metric]["ylabel"], fontsize=11)
+    ax.tick_params(labelsize=10)
+    ax.grid(which="major", color="#e1e0d9", linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncol=4, frameon=False,
+              fontsize=10)
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=200, bbox_inches="tight")
+    if show:
+        plt.show()
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator vs KK on a grid of mean and standard deviation (heatmaps.py)
+# ---------------------------------------------------------------------------
+
+HEATMAP_LABELS = {"lognormal": "Rozkład log-normalny", "gamma": "Rozkład gamma",
+                  "uniform": "Rozkład jednostajny"}
+
+
+def plot_orchestrator_heatmap(results, distribution, tau, values, limit, save_path=None,
+                              show=True):
+    """Heatmap of the median q = (D_O + 1) / (D_KK + 1) over the (mean, std) grid
+    for the orchestrator with threshold tau (tau = 0: LP+GNP on every dataset).
+
+    `values` is {(mean, std): median q} (heatmaps.cell_values). Color: log10 of the
+    median q on a common scale [-limit, limit]; blue: smaller D than KK, red:
+    larger D than KK, light: the same D. Grey background: the distribution cannot
+    reach CV = std / mean. Dashed line: std = tau * mean (target CV equal to tau).
+    """
+    means, stds = results["settings"]["means"], results["settings"]["stds"]
+    grid = [[math.log10(values[(m, s)]) if (m, s) in values else math.nan for m in means]
+            for s in stds]
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.6))
+    ax.set_facecolor(UNREACHABLE_COLOR)
+    mesh = ax.pcolormesh(_cell_edges(means), _cell_edges(stds), grid, cmap=DIVERGING,
+                         norm=TwoSlopeNorm(vmin=-limit, vcenter=0, vmax=limit),
+                         edgecolors="white", linewidth=1.2)
+
+    for i, s in enumerate(stds):
+        for j, m in enumerate(means):
+            if (m, s) not in values:
+                continue
+            q = values[(m, s)]
+            dark = abs(grid[i][j]) > 0.6 * limit
+            text = f"{q:.0f}" if q >= 100 else f"{q:.1f}".replace(".", ",")
+            ax.text(m, s, text, ha="center", va="center", fontsize=8, zorder=4,
+                    color="white" if dark else "#0b0b0b")
+
+    x_edges, y_edges = _cell_edges(means), _cell_edges(stds)
+    if tau > 0:
+        ax.plot([0, x_edges[-1]], [0, tau * x_edges[-1]], linestyle="--", color="#0b0b0b",
+                linewidth=1.5, alpha=0.7, zorder=3,
+                label=f"σ = {tau:g}·μ (zadane CV = τ)".replace(".", ","))
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), frameon=False, fontsize=10)
+    ax.set_xlim(x_edges[0], x_edges[-1])
+    ax.set_ylim(y_edges[0], y_edges[-1])
+    ax.set_xticks(means)
+    ax.set_yticks(stds)
+    ax.tick_params(labelsize=9)
+    ax.set_xlabel("Średnia μ", fontsize=11)
+    ax.set_ylabel("Odchylenie standardowe σ", fontsize=11)
+    threshold = "LP+GNP na każdym zbiorze" if tau == 0 else f"τ = {tau:g}".replace(".", ",")
+    ax.set_title(f"{HEATMAP_LABELS.get(distribution, distribution)}, {threshold}, "
+                 f"n = {results['n']}, k = {results['k']}", fontsize=11)
+    colorbar = fig.colorbar(mesh, ax=ax)
+    colorbar.set_label(r"$\log_{10}$ mediany $(D_\mathrm{O}+1)/(D_\mathrm{KK}+1)$", fontsize=10)
+
+    fig.tight_layout()
+    if save_path:
+        fig.savefig(save_path, dpi=200, bbox_inches="tight")
+    if show:
+        plt.show()
+    return fig
