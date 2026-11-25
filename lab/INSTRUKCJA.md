@@ -14,10 +14,10 @@ Program rozwiązuje trudniejszy wariant zadania, czyli podział liczb na `k` pod
 | Algorytm | `orchestrator \| gnp  \| kk \| lp` |
 | Dane wejściowe | `TAiOlab.txt`|
 | Liczba podzbiorów w każdym zbiorze | `k = 5` |
-| Próg CV tylko dla orkiestratora | `0.55` |
+| Domyślny próg CV orkiestratora | `0.55` |
 | Plik wynikowy | Obok pliku wejściowego |
 
-Program nie wymaga osobnej instalacji Pythona. Po zakończeniu wyświetla ścieżkę zapisanego pliku. Ponowne poprawne uruchomienie zastępuje poprzedni plik wynikowy. Nazwa wyjścia powstaje automatycznie, np. `dane.txt` → `dane_output.txt`.
+Ponowne poprawne uruchomienie zastępuje poprzedni plik wynikowy. Nazwa wyjścia powstaje automatycznie, np. `dane.txt` → `dane_output.txt`.
 
 ## Format wyniku
 
@@ -29,6 +29,10 @@ Nagłówek `2 5` oznacza dwa zbiory i pięć podzbiorów na zbiór. Po nagłówk
 
 Orkiestrator dobiera metodę na podstawie zmienności danych. Przy małej zmienności stosuje KK, a przy większej dzieli duże liczby z użyciem modelu MILP i przydziela pozostałe zachłannie.
 
-Próg `0.55` dobrano do demonstracji ścieżki hybrydowej.
+
+Próg `0.6` jest domyślną konfiguracją programu. Dla zbiorów w `TAiOlab.txt` zmierzone CV wynosi około `0.621` i `0.570`, więc pierwszy uruchamia ścieżkę hybrydową, a drugi KK.
+
+
+
 
 
