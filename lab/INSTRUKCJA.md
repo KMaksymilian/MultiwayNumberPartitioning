@@ -6,7 +6,7 @@ Program rozwiązuje trudniejszy wariant zadania, czyli podział liczb na `k` pod
 
 
 ```powershell
-.\MultiwayNumberPartitioning.exe --lab --algorithm orchestrator --dataset .\TAiOlab.txt -k 5 --cv-threshold 0.55
+.\MultiwayNumberPartitioning.exe --lab --algorithm orchestrator --dataset .\TAiOlab.txt -k 5 --cv-threshold 0.6
 ```
 
 | Parametr | Wartość dla przykładu |
@@ -14,7 +14,7 @@ Program rozwiązuje trudniejszy wariant zadania, czyli podział liczb na `k` pod
 | Algorytm | `orchestrator \| gnp  \| kk \| lp` |
 | Dane wejściowe | `TAiOlab.txt`|
 | Liczba podzbiorów w każdym zbiorze | `k = 5` |
-| Próg CV tylko dla orkiestratora | `0.55` |
+| Domyślny próg CV orkiestratora | `0.6` |
 | Plik wynikowy | Obok pliku wejściowego |
 
 Program nie wymaga osobnej instalacji Pythona. Po zakończeniu wyświetla ścieżkę zapisanego pliku. Ponowne poprawne uruchomienie zastępuje poprzedni plik wynikowy. Nazwa wyjścia powstaje automatycznie, np. `dane.txt` → `dane_output.txt`.
@@ -29,6 +29,16 @@ Nagłówek `2 5` oznacza dwa zbiory i pięć podzbiorów na zbiór. Po nagłówk
 
 Orkiestrator dobiera metodę na podstawie zmienności danych. Przy małej zmienności stosuje KK, a przy większej dzieli duże liczby z użyciem modelu MILP i przydziela pozostałe zachłannie.
 
-Próg `0.55` dobrano do demonstracji ścieżki hybrydowej.
+CV jest ilorazem odchylenia standardowego i średniej, więc może przekraczać `1`. Parametr `--cv-threshold` przyjmuje każdą skończoną wartość nieujemną. Orkiestrator wybiera KK, gdy zmierzone CV nie przekracza progu, a ścieżkę hybrydową przy większym CV.
+
+Próg `0.6` jest domyślną konfiguracją programu. Dla zbiorów w `TAiOlab.txt` zmierzone CV wynosi około `0.621` i `0.570`, więc pierwszy uruchamia ścieżkę hybrydową, a drugi KK.
+
+Wariant z progiem `4.26`, oceniany w raporcie, uruchamia się poleceniem:
+
+```powershell
+.\MultiwayNumberPartitioning.exe --lab --algorithm orchestrator --dataset .\TAiOlab.txt -k 5 --cv-threshold 4.26
+```
+
+Na tych dwóch przykładach wybiera on KK. W [badaniu porównawczym](../docs/kk_vs_orchestrator.md) na 1420 zbiorach uzyskał wynik równy KK w 1392 przypadkach i gorszy w 28. Dobór progu ma charakter empiryczny i zależy od badanych danych.
 
 

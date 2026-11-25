@@ -176,7 +176,8 @@ def main():
     )
 
     parser.add_argument("--repeats", type=int, default=3, help="Runs per dataset (default: 3)")
-    parser.add_argument("--cv-threshold", type=float, default=0.6)
+    parser.add_argument("--cv-threshold", type=float, default=0.6,
+                        help="Finite non-negative orchestrator CV threshold (default: 0.6; values above 1 are allowed)")
     parser.add_argument("--time-limit", type=float, default=1.0, help="Solver time limit in seconds")
     parser.add_argument("--seed", type=int, default=0, help="Dataset generation seed (default: 0)")
     parser.add_argument("--csv", type=Path, help="Write per-run results to CSV (overwrites file)")
@@ -195,8 +196,6 @@ def main():
 
     if args.lab and (args.generate or args.csv or args.algorithm == "all"):
         parser.error("--lab requires one explicit algorithm and cannot be combined with --generate or --csv.")
-    if args.lab and args.cv_threshold > 1:
-        parser.error("--cv-threshold must be between 0 and 1 in lab mode.")
 
     if args.generate:
         generate_datasets(args.seed)
